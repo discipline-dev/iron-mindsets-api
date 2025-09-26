@@ -6,6 +6,10 @@ import random
 import json
 from datetime import datetime
 import csv
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
@@ -54,17 +58,28 @@ def generate_quote(category=None, vibe=None):
         "Add 3-5 powerful hashtags."
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        max_tokens=100,
-        temperature=1.0
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=100,
+            temperature=1.0
+        )
+        message = response.choices[0].message.content.strip()
+    except Exception as e:
+        logging.error(f"OpenAI error: {e}")
+        return {
+            "quote": "Discipline is doing the work long after the mood has left you.",
+            "hashtags": "#IronMindsets #StayHard",
+            "category": category_choice,
+            "vibe": vibe_choice,
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e)
+        }
 
-    message = response.choices[0].message.content.strip()
     parts = message.rsplit("#", 1)
     quote = parts[0].strip().strip('"')
     hashtags = "#" + parts[1].strip() if len(parts) > 1 else ""
@@ -101,16 +116,17 @@ def get_quote():
     if quote_data is None:
         return jsonify({"error": "Filtered content. Try again."}), 400
 
-    # Log the request
     log_request(quote_data)
-
     return jsonify(quote_data)
 
 @app.route("/")
 def home():
     return jsonify({"message": "Iron Mindsets API. Use /quote to get motivated."})
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))  # Render gives you the port
     app.run(host="0.0.0.0", port=port)
